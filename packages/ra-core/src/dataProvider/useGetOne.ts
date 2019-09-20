@@ -1,6 +1,6 @@
 import { CRUD_GET_ONE } from '../actions/dataActions/crudGetOne';
 import { GET_ONE } from '../dataFetchActions';
-import { Identifier, ReduxState } from '../types';
+import { Identifier, ReduxState, Record } from '../types';
 import useQueryWithStore from './useQueryWithStore';
 
 /**
@@ -32,10 +32,18 @@ import useQueryWithStore from './useQueryWithStore';
  *     return <div>User {data.username}</div>;
  * };
  */
-const useGetOne = (resource: string, id: Identifier, options?: any) =>
+const useGetOne = <RecordType extends Record = Record>(
+    resource: string,
+    id: Identifier,
+    options?: any
+) =>
     useQueryWithStore(
-        { type: GET_ONE, resource, payload: { id } },
-        { ...options, action: CRUD_GET_ONE },
+        {
+            type: 'getOne',
+            resource,
+            payload: { id },
+        },
+        { ...options, action: CRUD_GET_ONE, fetch: GET_ONE },
         (state: ReduxState) =>
             state.admin.resources[resource]
                 ? state.admin.resources[resource].data[id]

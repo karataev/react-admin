@@ -1,7 +1,7 @@
 import { useSelector, shallowEqual } from 'react-redux';
 import { CRUD_GET_LIST } from '../actions/dataActions/crudGetList';
 import { GET_LIST } from '../dataFetchActions';
-import { Pagination, Sort, ReduxState } from '../types';
+import { Pagination, Sort, ReduxState, Record, RecordMap } from '../types';
 import useQueryWithStore from './useQueryWithStore';
 
 /**
@@ -41,16 +41,24 @@ import useQueryWithStore from './useQueryWithStore';
  *     )}</ul>;
  * };
  */
-const useGetList = (
+const useGetList = <RecordType extends Record = Record, FilterType = object>(
     resource: string,
     pagination: Pagination,
     sort: Sort,
-    filter: object,
+    filter: FilterType,
     options?: any
 ) => {
     const { data: ids, total, error, loading, loaded } = useQueryWithStore(
-        { type: GET_LIST, resource, payload: { pagination, sort, filter } },
-        { ...options, action: CRUD_GET_LIST },
+        {
+            type: 'getList',
+            resource,
+            payload: {
+                filter,
+                pagination,
+                sort,
+            },
+        },
+        { ...options, action: CRUD_GET_LIST, fetch: GET_LIST },
         (state: ReduxState) =>
             state.admin.resources[resource]
                 ? state.admin.resources[resource].list.ids
@@ -60,8 +68,8 @@ const useGetList = (
                 ? state.admin.resources[resource].list.total
                 : null
     );
-    const data = useSelector(
-        (state: ReduxState) =>
+    const data = useSelector<ReduxState, RecordMap<RecordType>>(
+        state =>
             state.admin.resources[resource]
                 ? state.admin.resources[resource].data
                 : null,

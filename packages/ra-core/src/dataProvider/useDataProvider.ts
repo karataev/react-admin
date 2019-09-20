@@ -1,4 +1,4 @@
-import { useCallback, useContext } from 'react';
+import { useContext, useMemo } from 'react';
 import { Dispatch } from 'redux';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -12,25 +12,107 @@ import {
 import { FETCH_END, FETCH_ERROR, FETCH_START } from '../actions/fetchActions';
 import { showNotification } from '../actions/notificationActions';
 import { refreshView } from '../actions/uiActions';
-import { ReduxState, DataProvider } from '../types';
+import {
+    ReduxState,
+    DataProvider,
+    Record,
+    GetListParams,
+    GetListResult,
+    GetManyParams,
+    GetManyResult,
+    GetManyReferenceParams,
+    GetManyReferenceResult,
+    GetOneParams,
+    GetOneResult,
+    CreateParams,
+    CreateResult,
+    DeleteParams,
+    DeleteResult,
+    DeleteManyParams,
+    DeleteManyResult,
+    UpdateParams,
+    UpdateResult,
+    UpdateManyParams,
+    UpdateManyResult,
+} from '../types';
 import useLogoutIfAccessDenied from '../auth/useLogoutIfAccessDenied';
 
-export type DataProviderHookFunction = (
-    type: string,
-    resource: string,
-    params: any,
-    options?: UseDataProviderOptions
-) => Promise<{ data?: any; total?: any; error?: any }>;
+export interface HookDataProvider {
+    create: <RecordType = Record, DataType = RecordType>(
+        resource: string,
+        params: CreateParams<DataType>,
+        options?: UseDataProviderOptions
+    ) => Promise<CreateResult<RecordType>>;
+
+    delete: <RecordType = Record>(
+        resource: string,
+        params: DeleteParams,
+        options?: UseDataProviderOptions
+    ) => Promise<DeleteResult<RecordType>>;
+
+    deleteMany: (
+        resource: string,
+        params: DeleteManyParams,
+        options?: UseDataProviderOptions
+    ) => Promise<DeleteManyResult>;
+
+    getList: <RecordType = Record, FilterType = object>(
+        resource: string,
+        params: GetListParams<FilterType>,
+        options?: UseDataProviderOptions
+    ) => Promise<GetListResult<RecordType>>;
+
+    getMany: <RecordType = Record>(
+        resource: string,
+        params: GetManyParams,
+        options?: UseDataProviderOptions
+    ) => Promise<GetManyResult<RecordType>>;
+
+    getManyReference: <RecordType = Record, FilterType = object>(
+        resource: string,
+        params: GetManyReferenceParams<FilterType>,
+        options?: UseDataProviderOptions
+    ) => Promise<GetManyReferenceResult<RecordType>>;
+
+    getOne: <RecordType = Record>(
+        resource: string,
+        params: GetOneParams,
+        options?: UseDataProviderOptions
+    ) => Promise<GetOneResult<RecordType>>;
+
+    update: <RecordType = Record, DataType = RecordType>(
+        resource: string,
+        params: UpdateParams<RecordType, DataType>
+    ) => Promise<UpdateResult<RecordType>>;
+
+    updateMany: <RecordType = Record, DataType = RecordType>(
+        resource: string,
+        params: UpdateManyParams<DataType>
+    ) => Promise<UpdateManyResult<RecordType>>;
+
+    [key: string]: any;
+}
 
 interface UseDataProviderOptions {
     action?: string;
+    fetch?: string;
     meta?: object;
     undoable?: boolean;
     onSuccess?: any;
     onFailure?: any;
 }
 
-const defaultDataProvider = () => Promise.resolve(); // avoids adding a context in tests
+const defaultDataProvider = {
+    create: () => Promise.resolve(null), // avoids adding a context in tests
+    delete: () => Promise.resolve(null), // avoids adding a context in tests
+    deleteMany: () => Promise.resolve(null), // avoids adding a context in tests
+    getList: () => Promise.resolve(null), // avoids adding a context in tests
+    getMany: () => Promise.resolve(null), // avoids adding a context in tests
+    getManyReference: () => Promise.resolve(null), // avoids adding a context in tests
+    getOne: () => Promise.resolve(null), // avoids adding a context in tests
+    update: () => Promise.resolve(null), // avoids adding a context in tests
+    updateMany: () => Promise.resolve(null), // avoids adding a context in tests
+};
 
 /**
  * Hook for getting an instance of the dataProvider as prop
@@ -72,7 +154,7 @@ const defaultDataProvider = () => Promise.resolve(); // avoids adding a context 
  *     }
  * }
  */
-const useDataProvider = (): DataProviderHookFunction => {
+const useDataProvider = (): HookDataProvider => {
     const dispatch = useDispatch() as Dispatch;
     const dataProvider = useContext(DataProviderContext) || defaultDataProvider;
     const isOptimistic = useSelector(
@@ -80,55 +162,72 @@ const useDataProvider = (): DataProviderHookFunction => {
     );
     const logoutIfAccessDenied = useLogoutIfAccessDenied();
 
-    return useCallback(
-        (
-            type: string,
-            resource: string,
-            payload: any,
-            options: UseDataProviderOptions = {}
-        ) => {
-            const {
-                action = 'CUSTOM_FETCH',
-                undoable = false,
-                onSuccess,
-                onFailure,
-                ...rest
-            } = options;
-            if (onSuccess && typeof onSuccess !== 'function') {
-                throw new Error('The onSuccess option must be a function');
-            }
-            if (onFailure && typeof onFailure !== 'function') {
-                throw new Error('The onFailure option must be a function');
-            }
-            if (undoable && !onSuccess) {
-                throw new Error(
-                    'You must pass an onSuccess callback calling notify() to use the undoable mode'
-                );
-            }
-            if (isOptimistic) {
-                // in optimistic mode, all fetch actions are canceled,
-                // so the admin uses the store without synchronization
-                return Promise.resolve();
-            }
+    const dataProviderProxy = useMemo(() => {
+        // A fake dataProvider to make typescript happy so that it types correctly the proxy
+        const proxiedDataProvider: HookDataProvider = {
+            create: () => null,
+            delete: () => null,
+            deleteMany: () => null,
+            getList: () => null,
+            getOne: () => null,
+            getMany: () => null,
+            getManyReference: () => null,
+            update: () => null,
+            updateMany: () => null,
+        };
 
-            const params = {
-                type,
-                payload,
-                resource,
-                action,
-                rest,
-                onSuccess,
-                onFailure,
-                dataProvider,
-                dispatch,
-                logoutIfAccessDenied,
-            };
-            return undoable
-                ? performUndoableQuery(params)
-                : performQuery(params);
-        },
-        [dataProvider, dispatch, isOptimistic, logoutIfAccessDenied]
-    );
+        return new Proxy(proxiedDataProvider, {
+            get: (target, name) => {
+                return (resource, payload, options) => {
+                    const {
+                        action = 'CUSTOM_FETCH',
+                        undoable = false,
+                        onSuccess,
+                        onFailure,
+                        ...rest
+                    } = options;
+                    if (onSuccess && typeof onSuccess !== 'function') {
+                        throw new Error(
+                            'The onSuccess option must be a function'
+                        );
+                    }
+                    if (onFailure && typeof onFailure !== 'function') {
+                        throw new Error(
+                            'The onFailure option must be a function'
+                        );
+                    }
+                    if (undoable && !onSuccess) {
+                        throw new Error(
+                            'You must pass an onSuccess callback calling notify() to use the undoable mode'
+                        );
+                    }
+                    if (isOptimistic) {
+                        // in optimistic mode, all fetch actions are canceled,
+                        // so the admin uses the store without synchronization
+                        return Promise.resolve();
+                    }
+
+                    const params = {
+                        type: name.toString(),
+                        payload,
+                        resource,
+                        action,
+                        rest,
+                        onSuccess,
+                        onFailure,
+                        dataProvider,
+                        dispatch,
+                        logoutIfAccessDenied,
+                    };
+                    return undoable
+                        ? performUndoableQuery(params)
+                        : performQuery(params);
+                };
+            },
+        });
+    }, [dataProvider, dispatch, isOptimistic, logoutIfAccessDenied]);
+
+    return dataProviderProxy;
 };
 
 /**
@@ -190,7 +289,7 @@ const performUndoableQuery = ({
             meta: { resource, ...rest },
         });
         dispatch({ type: FETCH_START });
-        dataProvider(type, resource, payload)
+        dataProvider[type](resource, payload)
             .then(response => {
                 if (process.env.NODE_ENV !== 'production') {
                     validateResponseFormat(response, type);
@@ -281,7 +380,7 @@ const performQuery = ({
     });
     dispatch({ type: FETCH_START });
 
-    return dataProvider(type, resource, payload)
+    return dataProvider[type](resource, payload)
         .then(response => {
             if (process.env.NODE_ENV !== 'production') {
                 validateResponseFormat(response, type);

@@ -1,7 +1,6 @@
 import { useSelector, shallowEqual } from 'react-redux';
 import { CRUD_GET_MANY_REFERENCE } from '../actions/dataActions/crudGetManyReference';
-import { GET_MANY_REFERENCE } from '../dataFetchActions';
-import { Pagination, Sort, Identifier, ReduxState } from '../types';
+import { Pagination, Sort, Identifier, ReduxState, Record } from '../types';
 import useQueryWithStore from './useQueryWithStore';
 import {
     getReferences,
@@ -10,6 +9,7 @@ import {
     nameRelatedTo,
 } from '../reducer/admin/references/oneToMany';
 import { useMemo } from 'react';
+import { GET_MANY_REFERENCE } from '../dataFetchActions';
 
 /**
  * Call the dataProvider with a GET_MANY_REFERENCE verb and return the result as well as the loading state.
@@ -55,13 +55,16 @@ import { useMemo } from 'react';
  *     )}</ul>;
  * };
  */
-const useGetManyReference = (
+const useGetManyReference = <
+    RecordType extends Record = Record,
+    FilterType extends object = object
+>(
     resource: string,
     target: string,
     id: Identifier,
     pagination: Pagination,
     sort: Sort,
-    filter: object,
+    filter: FilterType,
     referencingResource: string,
     options?: any
 ) => {
@@ -72,15 +75,23 @@ const useGetManyReference = (
 
     const { data: ids, total, error, loading, loaded } = useQueryWithStore(
         {
-            type: GET_MANY_REFERENCE,
-            resource: resource,
+            type: 'getManyReference',
+            resource,
             payload: { target, id, pagination, sort, filter },
         },
-        { ...options, relatedTo, action: CRUD_GET_MANY_REFERENCE },
+        {
+            ...options,
+            relatedTo,
+            action: CRUD_GET_MANY_REFERENCE,
+            fetch: GET_MANY_REFERENCE,
+        },
         selectIds(relatedTo),
         selectTotal(relatedTo)
     );
-    const data = useSelector(selectData(resource, relatedTo), shallowEqual);
+    const data = useSelector<ReduxState, RecordType>(
+        selectData(resource, relatedTo),
+        shallowEqual
+    );
 
     return { data, ids, total, error, loading, loaded };
 };

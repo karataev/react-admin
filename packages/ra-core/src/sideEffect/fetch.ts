@@ -18,6 +18,16 @@ import {
     fetchActionsWithArrayOfIdentifiedRecordsResponse,
     fetchActionsWithArrayOfRecordsResponse,
     fetchActionsWithTotalResponse,
+    GET_LIST,
+    GET_ONE,
+    GET_MANY,
+    GET_MANY_REFERENCE,
+    DELETE,
+    DELETE_MANY,
+    UPDATE,
+    UPDATE_MANY,
+    CREATE,
+    sanitizeFetchType,
 } from '../dataFetchActions';
 
 function validateResponseFormat(
@@ -110,8 +120,7 @@ export function* handleFetch(
             put({ type: FETCH_START }),
         ]);
         const response = yield call(
-            dataProvider,
-            restType,
+            dataProvider[sanitizeFetchType(restType)],
             meta.resource,
             payload
         );

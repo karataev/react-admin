@@ -6,10 +6,12 @@ import {
     downloadCSV,
     useDataProvider,
     useNotify,
-    GET_MANY,
+    HookDataProvider,
     GET_LIST,
     Sort,
     DataProvider,
+    Record,
+    Identifier,
 } from 'ra-core';
 import jsonExport from 'jsonexport/dist';
 
@@ -39,9 +41,9 @@ const sanitizeRestProps = ({ basePath, ...rest }: any) => rest;
  * @param {Object[]} records An array of records
  * @param {string} field the identifier of the record field to use
  */
-export const getRelatedIds = (records, field) =>
+export const getRelatedIds = (records: Record[], field) =>
     Array.from(
-        new Set(
+        new Set<Identifier>(
             records
                 .filter(record => record[field] != null)
                 .map(record => record[field])
@@ -60,14 +62,19 @@ export const getRelatedIds = (records, field) =>
  *              post_title: posts[record.post_id].title,
  *          }));
  */
-const fetchRelatedRecords = dataProvider => (data, field, resource) =>
-    dataProvider(GET_MANY, resource, { ids: getRelatedIds(data, field) }).then(
-        ({ data }) =>
+const fetchRelatedRecords = (dataProvider: HookDataProvider) => (
+    data,
+    field,
+    resource
+) =>
+    dataProvider
+        .getMany(resource, { ids: getRelatedIds(data, field) })
+        .then(({ data }) =>
             data.reduce((acc, post) => {
                 acc[post.id] = post;
                 return acc;
             }, {})
-    );
+        );
 
 const DefaultIcon = <DownloadIcon />;
 const defaultFilter = {};
@@ -107,11 +114,12 @@ const ExportButton: FunctionComponent<Props & ButtonProps> = ({
     const notify = useNotify();
     const handleClick = useCallback(
         event => {
-            dataProvider(GET_LIST, resource, {
-                sort,
-                filter,
-                pagination: { page: 1, perPage: maxResults },
-            })
+            dataProvider
+                .get(resource, {
+                    sort,
+                    filter,
+                    pagination: { page: 1, perPage: maxResults },
+                })
                 .then(({ data }) =>
                     exporter
                         ? exporter(

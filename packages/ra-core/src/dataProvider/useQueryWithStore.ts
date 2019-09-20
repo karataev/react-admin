@@ -5,6 +5,7 @@ import isEqual from 'lodash/isEqual';
 import { ReduxState } from '../types';
 import { useSafeSetState } from '../util/hooks';
 import useDataProvider from './useDataProvider';
+import { sanitizeFetchType } from '../dataFetchActions';
 
 export interface Query {
     type: string;
@@ -122,7 +123,7 @@ const useQueryWithStore = (
     }
     const dataProvider = useDataProvider();
     useEffect(() => {
-        dataProvider(type, resource, payload, options)
+        dataProvider[sanitizeFetchType(type)](resource, payload, options)
             .then(() => {
                 // We don't care about the dataProvider response here, because
                 // it was already passed to SUCCESS reducers by the dataProvider

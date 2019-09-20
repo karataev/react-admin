@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { useSafeSetState } from '../util/hooks';
 import useDataProvider from './useDataProvider';
 import useDataProviderWithDeclarativeSideEffects from './useDataProviderWithDeclarativeSideEffects';
+import { sanitizeFetchType } from '../dataFetchActions';
 
 export interface Query {
     type: string;
@@ -103,7 +104,11 @@ const useQuery = (
             ? dataProviderWithDeclarativeSideEffects
             : dataProvider;
 
-        dataProviderWithSideEffects(type, resource, payload, options)
+        dataProviderWithSideEffects[sanitizeFetchType(type)](
+            resource,
+            payload,
+            options
+        )
             .then(({ data, total }) => {
                 setState({
                     data,
